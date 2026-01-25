@@ -3,12 +3,32 @@ import pandas as pd
 ## INPUT THE CURRENT SEASON BELOW ##
 current_season = '2025'
 
+def validate_num_types(value):
+    """
+    Convert a percentage value to a decimal.
+    If the value contains a '%' sign, strips it and divides by 100.
+    Otherwise, converts to float as-is.
+    
+    Examples:
+        "54.6%" -> 0.546
+        "12.5" -> 12.5
+    """
+    value_str = str(value)
+    if '--' in value_str:
+        return 'n/a'
+    elif '%' in value_str:
+        return float(value_str.replace('%', '')) / 100
+    else:
+        return float(value)
+
 def scrape_ratings_url(url):
     df = pd.read_html(url)[0]
     df['Team'] = df['Team'].str.rsplit('(', n=1).str[0] #split the string once on the last "(", select the first substring
     df['Team'] = df['Team'].str[:-1] #remove last character (should be a space)
     df.set_index('Team', inplace = True)
     df = df[['Rank', 'Rating']]
+    df['Rank'] = pd.to_numeric(df['Rank'], errors='coerce')
+    df['Rating'] = df['Rating'].apply(validate_num_types)
     df.rename(columns={'Rating': 'Value'}, inplace = True)
     return df
 
@@ -17,10 +37,13 @@ def scrape_stats_url(url):
     df.set_index('Team', inplace = True)
     if(url == 'https://www.teamrankings.com/ncaa-basketball/stat/effective-field-goal-pct'):
         df = df[['Rank', current_season, 'Away']] #EFGPct is the only stat where we care about the Away value
+        df['Away'] = df['Away'].apply(validate_num_types)
         df.rename(columns={'Away': 'Value_AwayEFGPct'}, inplace = True)
         df['Rank_AwayEFGPct'] = df['Value_AwayEFGPct'].rank(method='min', ascending=False)
     else:
         df = df[['Rank', current_season]]
+    df['Rank'] = pd.to_numeric(df['Rank'], errors='coerce')
+    df[current_season] = df[current_season].apply(validate_num_types)
     df.rename(columns={current_season: 'Value'}, inplace = True)
     return df
 
